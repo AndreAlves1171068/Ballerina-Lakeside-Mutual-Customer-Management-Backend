@@ -1,0 +1,13 @@
+[package]
+org = "andre"
+name = "customer_management_backend"
+version = "0.1.0"
+distribution = "2201.4.1"
+
+[build-options]
+observabilityIncluded = true
+
+[[platform.java11.dependency]]
+artifactId = "h2"
+version = "2.1.214"
+groupId = "com.h2database"

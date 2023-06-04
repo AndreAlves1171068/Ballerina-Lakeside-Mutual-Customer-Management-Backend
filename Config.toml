@@ -1,0 +1,8 @@
+port = 8100
+apiKeyHeader = "Authorization"
+apiKeyValue = "9b93ebe19e16bbbd"
+datasource = "jdbc:h2:file:./customermanagement"
+username = "sa"
+password = "sa"
+baseUrl = "localhost:8110"
+ddl_auto = "update"
