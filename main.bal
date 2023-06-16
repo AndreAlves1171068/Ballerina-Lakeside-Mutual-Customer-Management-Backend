@@ -255,7 +255,6 @@ public type InteractionLogNotFoundException record {|
     *http:NotFound;
 |};
 
-configurable string apiKeyHeader = ?;
 configurable string apiKeyValue = ?;
 configurable string baseUrl = ?;
 configurable string datasource = ?;
@@ -263,7 +262,7 @@ configurable string username = ?;
 configurable string password = ?;
 configurable string ddl_auto = ?;
 
-final http:Client coreClient = check new ("http://"+baseUrl,
+http:Client coreClient = check new ("http://"+baseUrl,
     auth = {
         token: apiKeyValue
     }
@@ -271,7 +270,7 @@ final http:Client coreClient = check new ("http://"+baseUrl,
 
 final string errorMessage = "Failed to connect to Customer Core.";
 
-final jdbc:Client jdbcClient = check new (
+jdbc:Client jdbcClient = check new (
     url =  datasource, 
    user = username, password = password,
    options = {
@@ -281,10 +280,10 @@ final jdbc:Client jdbcClient = check new (
        maxOpenConnections: 1000
    });
 
-public isolated function getCustomer(CustomerId customerId) returns (()|CustomerDto|error<CustomerCoreNotAvailableException>) {
+public function getCustomer(CustomerId customerId) returns (()|CustomerDto|error<CustomerCoreNotAvailableException>) {
     string? customerIdString = customerId.getId();
     if(customerIdString is string){
-        CustomersDto|error response = coreClient->/customers/[customerIdString];
+        CustomersDto|error response = coreClient->get("/customers/" + customerIdString);
         if(response is CustomersDto){
             if(response.customers.length() == 0){
                 return ();
@@ -303,8 +302,8 @@ public isolated function getCustomer(CustomerId customerId) returns (()|Customer
     }
 }
 
-public isolated function getCustomers(string filter = "", int 'limit = 10, int offset = 0) returns (PaginatedCustomerResponseDto|error<CustomerCoreNotAvailableException>) {
-    PaginatedCustomerResponseDto|error response = coreClient->/customers(filter=filter,'limit='limit,offset=offset);
+public function getCustomers(string filter = "", int 'limit = 10, int offset = 0) returns (PaginatedCustomerResponseDto|error<CustomerCoreNotAvailableException>) {
+    PaginatedCustomerResponseDto|error response = coreClient->get("/customers?filter=" + filter + "&limit=" + 'limit.toString() + "&offset=" + offset.toString());
 
     if(response is PaginatedCustomerResponseDto){
         return response;
@@ -315,13 +314,13 @@ public isolated function getCustomers(string filter = "", int 'limit = 10, int o
     }
 }
 
-public isolated function updateCustomer(CustomerId customerId, CustomerProfileDto customerProfile) returns (CustomerDto|error<CustomerCoreNotAvailableException> ){
+public function updateCustomer(CustomerId customerId, CustomerProfileDto customerProfile) returns (CustomerDto|error<CustomerCoreNotAvailableException> ){
     string? customerIdString = customerId.getId();
     if(customerIdString is string){
         http:Request request = new;
         request.setJsonPayload(customerProfile.toJson());
 
-        CustomerDto|error response = coreClient->/customers/[customerIdString].put(request);
+        CustomerDto|error response = coreClient->put("/customers/" + customerIdString,request);
 
         if(response is CustomerDto){
             return response;
@@ -337,7 +336,7 @@ public isolated function updateCustomer(CustomerId customerId, CustomerProfileDt
     }
 }
 
-public isolated function getInteractionLogs() returns InteractionLogAggregateRoot[]|error{
+public function getInteractionLogs() returns InteractionLogAggregateRoot[]|error{
     stream<InteractionLogAggregateRootRecord, error?> entries = jdbcClient->query(`SELECT CUSTOMER_ID, USERNAME,LAST_ACKNOWLEDGED_INTERACTION_ID FROM INTERACTIONLOGS`);
     InteractionLogAggregateRoot[] logs = [];
     check from InteractionLogAggregateRootRecord item in entries
@@ -362,7 +361,7 @@ public isolated function getInteractionLogs() returns InteractionLogAggregateRoo
     return logs;
 }
 
-public isolated function getInteractionLog(string customerId) returns InteractionLogAggregateRoot|error {
+public function getInteractionLog(string customerId) returns InteractionLogAggregateRoot|error {
     InteractionLogAggregateRootRecord rec = check jdbcClient->queryRow(`SELECT CUSTOMER_ID, USERNAME,LAST_ACKNOWLEDGED_INTERACTION_ID 
                                                                         FROM INTERACTIONLOGS 
                                                                         WHERE CUSTOMER_ID = ${customerId}`);
@@ -382,7 +381,7 @@ public isolated function getInteractionLog(string customerId) returns Interactio
     return new(rec.customer_Id,rec.username,rec.last_acknowledged_interaction_id,interactions);
 }
 
-public isolated function addInteractionLog(InteractionLogAggregateRoot log) returns string?|error {
+public function addInteractionLog(InteractionLogAggregateRoot log) returns string?|error {
     sql:ExecutionResult result = check jdbcClient->execute(`INSERT INTO INTERACTIONLOGS VALUES (${log.getCustomerId()}, ${log.getUsername()},${log.getLastAcknowledgedInteractionId()})`);
     int|string? affectedRowCount = result.affectedRowCount;
     if(affectedRowCount is int && affectedRowCount != 0){
@@ -403,7 +402,7 @@ public isolated function addInteractionLog(InteractionLogAggregateRoot log) retu
     return error("Failed to insert record");
 }
 
-public isolated function updateInteractionLog(InteractionLogAggregateRoot log) returns string?|error {
+public function updateInteractionLog(InteractionLogAggregateRoot log) returns string?|error {
     sql:ExecutionResult result = check jdbcClient->execute(`UPDATE INTERACTIONLOGS SET USERNAME = ${log.getUsername()},
                                                             LAST_ACKNOWLEDGED_INTERACTION_ID = ${log.getLastAcknowledgedInteractionId()} WHERE CUSTOMER_ID = ${log.getCustomerId()}`);
     int|string? affectedRowCount = result.affectedRowCount;
@@ -426,7 +425,7 @@ public isolated function updateInteractionLog(InteractionLogAggregateRoot log) r
     return error("Failed to update record");
 }
 
-public isolated function deleteInteractionLog(string customerId) returns int|error {
+public function deleteInteractionLog(string customerId) returns int|error {
     sql:ExecutionResult result = check jdbcClient->execute(`DELETE FROM INTERACTIONLOGS_INTERACTIONS WHERE INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID = ${customerId}`);
     int|string? affectedRowCount = result.affectedRowCount;
     if(affectedRowCount is int && affectedRowCount != 0){
@@ -438,7 +437,7 @@ public isolated function deleteInteractionLog(string customerId) returns int|err
     
 }
 
-public isolated function getNotifications() returns Notification[]|error {
+public function getNotifications() returns Notification[]|error {
     Notification[] notifications = [];
     InteractionLogAggregateRoot[] interactionlogs = check getInteractionLogs();
     foreach InteractionLogAggregateRoot item in interactionlogs {
@@ -470,25 +469,21 @@ service class WsService {
                 interactions.push(interaction);
                 interactionLog = new (optInteractionLog.getCustomerId(),optInteractionLog.getUsername(),optInteractionLog.getLastAcknowledgedInteractionId(),interactions);
                 _ = check updateInteractionLog(interactionLog);
-                _ = check broadcastNotifications();
-                websocket:Client wsClient = check new(clientUrl);
-                MessageDto dto = {id:id, date:date, customerId:message.customerId, username:message.username, content:message.content, sentByOperator:message.sentByOperator};
-                check wsClient->writeMessage(dto);
             }
         }else{
             InteractionEntity[] interactions = [];
             interactions.push(interaction);
             interactionLog = new (customerId,message.username,(),interactions);
             _ = check addInteractionLog(interactionLog);
-            _ = check broadcastNotifications();
-            websocket:Client wsClient = check new(clientUrl);
-            MessageDto dto = {id:id, date:date, customerId:message.customerId, username:message.username, content:message.content, sentByOperator:message.sentByOperator};
-            check wsClient->writeMessage(dto);
         }
+        _ = check broadcastNotifications();
+        websocket:Client wsClient = check new(clientUrl);
+        MessageDto dto = {id:id, date:date, customerId:message.customerId, username:message.username, content:message.content, sentByOperator:message.sentByOperator};
+        check wsClient->writeMessage(dto);
     }
 }
 
-isolated function broadcastNotifications() returns error?{
+function broadcastNotifications() returns error?{
     log:printInfo("Broadcasting updated notifications");
     Notification[]|error tmp = getNotifications();
     if(tmp is Notification[]){
