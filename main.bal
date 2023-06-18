@@ -127,7 +127,7 @@ public class InteractionLogAggregateRoot {
         any tmp = self.getInteractions();
         if(tmp is InteractionEntity[]){
             InteractionEntity[] interactions = tmp.filter(i => i.isSentByOperator() == false);
-            if(self.lastAcknowledgedInteractionId == ()){
+            if(self.lastAcknowledgedInteractionId == ""){
                 return interactions.length();
             }else{
                 int count = 0;

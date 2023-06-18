@@ -10,10 +10,10 @@ function beforeSuite() {
 }
 
 @test:Config
-
 function testGetNumberOfUnacknowledgedInteractions(){
-    InteractionEntity entity = new InteractionEntity("01ee0bb2-7b8d-1350-90be-4dfe19bfcc19","2023-06-15 20:26:10.177205","TEST", false);
-    InteractionLogAggregateRoot log = new InteractionLogAggregateRoot("bunlo9vk5f","test","",[entity]);
+    InteractionEntity mockEntity = test:mock(InteractionEntity);
+    test:prepare(mockEntity).when("isSentByOperator").thenReturn(false);
+    InteractionLogAggregateRoot log = new InteractionLogAggregateRoot("bunlo9vk5f","test","",[mockEntity]);
     test:assertEquals(log.getNumberOfUnacknowledgedInteractions(),1);
 }
 

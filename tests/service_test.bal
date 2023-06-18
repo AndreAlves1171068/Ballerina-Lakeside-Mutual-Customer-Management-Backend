@@ -28,20 +28,8 @@ function testGetCustomerRest() returns error?{
     };
 
     CustomersDto mockDto = {customers: [customer]};
-
-    json expected = {
-        "customerId": "bunlo9vk5f",
-        "firstname": "Ado",
-        "lastname": "Kinnett",
-        "birthday": "1975-06-13T23:00:00.000+00:00",
-        "streetAddress": "2 Autumn Leaf Lane",
-        "postalCode": "6500",
-        "city": "Bellinzona",
-        "email": "akinnetta@example.com",
-        "phoneNumber": "055 222 4111",
-        "moveHistory": []
-    };
     
+    json expected = customer.toJson();
     
     test:prepare(coreClient).when("get").withArguments("/customers/bunlo9vk5f").thenReturn(mockDto);
     http:Response result = check testClient->get("/customers/bunlo9vk5f");
@@ -60,12 +48,7 @@ function testGetInteractionLogRest() returns error?{
         "interactions": []
     };
 
-    json expected = {
-        "customerId": "bunlo9vk5f",
-        "username": "test",
-        "lastAcknowledgedInteractionId": "",
-        "interactions": []
-    };
+    json expected = mockLog.toJson();
 
     test:prepare(jdbcClient).when("queryRow").thenReturn(mockLog);
     test:prepare(jdbcClient).when("query").thenReturn(mockEntities);
