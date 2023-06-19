@@ -63,5 +63,7 @@ public function testWebsocket() returns error? {
     var resp = wsTestClient.getHttpResponse();
     if resp is http:Response {
         test:assertEquals(resp.statusCode,http:STATUS_SWITCHING_PROTOCOLS);
+    }else{
+        test:assertFail("This test failed due to not receiving an HTTP Response.");
     }
 }
