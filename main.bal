@@ -182,9 +182,9 @@ public class Notification {
 }
 
 public type AddressDto record {|
-     string streetAddress;
-	 string postalCode;
-	 string city;
+    string streetAddress;
+    string postalCode;
+    string city;
 |};
 
 public type CustomerDto record {
@@ -272,13 +272,13 @@ final string errorMessage = "Failed to connect to Customer Core.";
 
 jdbc:Client jdbcClient = check new (
     url =  datasource, 
-   user = username, password = password,
-   options = {
-      properties: {"connectionTimeout": "300000"}
-   },
-   connectionPool = {
-       maxOpenConnections: 1000
-   });
+    user = username, password = password,
+    options = {
+        properties: {"connectionTimeout": "300000"}
+    },
+    connectionPool = {
+        maxOpenConnections: 1000
+    });
 
 public function getCustomer(CustomerId customerId) returns (()|CustomerDto|error<CustomerCoreNotAvailableException>) {
     string? customerIdString = customerId.getId();
@@ -341,18 +341,12 @@ public function getInteractionLogs() returns InteractionLogAggregateRoot[]|error
     InteractionLogAggregateRoot[] logs = [];
     check from InteractionLogAggregateRootRecord item in entries
         do {
-            stream<InteractionEntityRecord, error?> interactionsEntries = jdbcClient->query(`SELECT ID,DATE,CONTENT,SENT_BY_OPERATOR 
-                                                                                            FROM INTERACTIONS 
-                                                                                            WHERE ID IN (
-                                                                                                SELECT INTERACTIONS_ID 
-                                                                                                FROM INTERACTIONLOGS_INTERACTIONS 
-                                                                                                WHERE INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID = ${item.customer_Id}
-                                                                                            )`);
+            stream<InteractionEntityRecord, error?> interactionsEntries = jdbcClient->query(`SELECT ID,DATE,CONTENT,SENT_BY_OPERATOR FROM INTERACTIONS WHERE ID IN (SELECT INTERACTIONS_ID FROM INTERACTIONLOGS_INTERACTIONS WHERE INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID = ${item.customer_Id})`);
             InteractionEntity[] interactions = [];
             InteractionEntityRecord[] recs = check from InteractionEntityRecord item2 in interactionsEntries select item2;
             foreach InteractionEntityRecord rec in recs {
                 InteractionEntity e = new(rec.id,rec.date,rec.content,rec.sent_by_operator);
-                    interactions.push(e);
+                interactions.push(e);
             }
             check interactionsEntries.close();
             logs.push(new(item.customer_Id,item.username,item.last_acknowledged_interaction_id, interactions));
@@ -362,16 +356,8 @@ public function getInteractionLogs() returns InteractionLogAggregateRoot[]|error
 }
 
 public function getInteractionLog(string customerId) returns InteractionLogAggregateRoot|error {
-    InteractionLogAggregateRootRecord rec = check jdbcClient->queryRow(`SELECT CUSTOMER_ID, USERNAME,LAST_ACKNOWLEDGED_INTERACTION_ID 
-                                                                        FROM INTERACTIONLOGS 
-                                                                        WHERE CUSTOMER_ID = ${customerId}`);
-    stream<InteractionEntityRecord, error?> interactionsEntries = jdbcClient->query(`SELECT ID,DATE,CONTENT,SENT_BY_OPERATOR 
-                                                                                     FROM INTERACTIONS 
-                                                                                     WHERE ID IN (
-                                                                                        SELECT INTERACTIONS_ID 
-                                                                                        FROM INTERACTIONLOGS_INTERACTIONS 
-                                                                                        WHERE INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID = ${rec.customer_Id}
-                                                                                    )`);
+    InteractionLogAggregateRootRecord rec = check jdbcClient->queryRow(`SELECT CUSTOMER_ID, USERNAME,LAST_ACKNOWLEDGED_INTERACTION_ID FROM INTERACTIONLOGS WHERE CUSTOMER_ID = ${customerId}`);
+    stream<InteractionEntityRecord, error?> interactionsEntries = jdbcClient->query(`SELECT ID,DATE,CONTENT,SENT_BY_OPERATOR FROM INTERACTIONS WHERE ID IN (SELECT INTERACTIONS_ID FROM INTERACTIONLOGS_INTERACTIONS WHERE INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID = ${rec.customer_Id})`);
     InteractionEntity[] interactions = [];
     check from InteractionEntityRecord item2 in interactionsEntries 
         do {
@@ -388,14 +374,11 @@ public function addInteractionLog(InteractionLogAggregateRoot log) returns strin
         InteractionEntity[]? tmp = log.getInteractions();
         if(tmp is InteractionEntity[]){ 
             if(tmp.length()>0){
-                sql:ParameterizedQuery[] batch = from InteractionEntity item in tmp
-                                                select `INSERT INTO INTERACTIONS VALUES (${item.getId()}, ${item.getDate()},${item.getContent()},${item.isSentByOperator()})`;
+                sql:ParameterizedQuery[] batch = from InteractionEntity item in tmp select `INSERT INTO INTERACTIONS VALUES (${item.getId()}, ${item.getDate()},${item.getContent()},${item.isSentByOperator()})`;
                 _ = check jdbcClient->batchExecute(batch); 
-                sql:ParameterizedQuery[] batch2 = from InteractionEntity item in tmp
-                                                select `INSERT INTO INTERACTIONLOGS_INTERACTIONS VALUES (${log.getCustomerId()},${item.getId()})`;
+                sql:ParameterizedQuery[] batch2 = from InteractionEntity item in tmp select `INSERT INTO INTERACTIONLOGS_INTERACTIONS VALUES (${log.getCustomerId()},${item.getId()})`;
                 _ = check jdbcClient->batchExecute(batch2); 
-            }
-                                                              
+            }                                           
             return log.getCustomerId();
         }
     }
@@ -403,18 +386,15 @@ public function addInteractionLog(InteractionLogAggregateRoot log) returns strin
 }
 
 public function updateInteractionLog(InteractionLogAggregateRoot log) returns string?|error {
-    sql:ExecutionResult result = check jdbcClient->execute(`UPDATE INTERACTIONLOGS SET USERNAME = ${log.getUsername()},
-                                                            LAST_ACKNOWLEDGED_INTERACTION_ID = ${log.getLastAcknowledgedInteractionId()} WHERE CUSTOMER_ID = ${log.getCustomerId()}`);
+    sql:ExecutionResult result = check jdbcClient->execute(`UPDATE INTERACTIONLOGS SET USERNAME = ${log.getUsername()},LAST_ACKNOWLEDGED_INTERACTION_ID = ${log.getLastAcknowledgedInteractionId()} WHERE CUSTOMER_ID = ${log.getCustomerId()}`);
     int|string? affectedRowCount = result.affectedRowCount;
     if(affectedRowCount is int && affectedRowCount != 0){
         InteractionEntity[]? tmp = log.getInteractions();
         if(tmp is InteractionEntity[]){
             if(tmp.length() > 0){
-                sql:ParameterizedQuery[] batch = from InteractionEntity item in tmp
-                                                select `MERGE INTO INTERACTIONS KEY (ID) VALUES (${item.getId()},${item.getDate()},${item.getContent()},${item.isSentByOperator()})`;
+                sql:ParameterizedQuery[] batch = from InteractionEntity item in tmp select `MERGE INTO INTERACTIONS KEY (ID) VALUES (${item.getId()},${item.getDate()},${item.getContent()},${item.isSentByOperator()})`;
                 _ = check jdbcClient->batchExecute(batch);  
-                sql:ParameterizedQuery[] batch2 = from InteractionEntity item in tmp
-                                                select `MERGE INTO INTERACTIONLOGS_INTERACTIONS KEY (INTERACTIONS_ID) VALUES (${log.getCustomerId()},${item.getId()})`;
+                sql:ParameterizedQuery[] batch2 = from InteractionEntity item in tmp select `MERGE INTO INTERACTIONLOGS_INTERACTIONS KEY (INTERACTIONS_ID) VALUES (${log.getCustomerId()},${item.getId()})`;
                 _ = check jdbcClient->batchExecute(batch2);   
             }                                             
             return log.getCustomerId();
@@ -509,27 +489,11 @@ public function main() returns error?{
         _ = check jdbcClient->execute(`DROP TABLE IF EXISTS INTERACTIONS`);
     }
 
-    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONS(
-        ID VARCHAR(255) NOT NULL,
-        DATE TIMESTAMP,
-        CONTENT VARCHAR(255),
-        SENT_BY_OPERATOR BOOLEAN NOT NULL,
-        PRIMARY KEY (ID)
-    )`);
+    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONS(ID VARCHAR(255) NOT NULL,DATE TIMESTAMP,CONTENT VARCHAR(255),SENT_BY_OPERATOR BOOLEAN NOT NULL,PRIMARY KEY (ID))`);
 
-    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONLOGS(
-        CUSTOMER_ID VARCHAR(255) NOT NULL,
-        USERNAME VARCHAR(255),
-        LAST_ACKNOWLEDGED_INTERACTION_ID  VARCHAR(255),
-        PRIMARY KEY (CUSTOMER_ID)
-    )`);
+    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONLOGS(CUSTOMER_ID VARCHAR(255) NOT NULL,USERNAME VARCHAR(255),LAST_ACKNOWLEDGED_INTERACTION_ID  VARCHAR(255),PRIMARY KEY (CUSTOMER_ID))`);
 
-    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONLOGS_INTERACTIONS(
-        INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID VARCHAR(255) NOT NULL,
-        INTERACTIONS_ID VARCHAR(255) NOT NULL,
-        CONSTRAINT FKNRLR4POAGW2DTE8QMGEWNL9EU_INDEX_B FOREIGN KEY (INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID) REFERENCES INTERACTIONLOGS(CUSTOMER_ID),
-        CONSTRAINT UK_F9MORY4MPI8W7CI4IBSS33M11_INDEX_B UNIQUE (INTERACTIONS_ID)
-    )`);
+    _ = check jdbcClient->execute(`CREATE TABLE IF NOT EXISTS INTERACTIONLOGS_INTERACTIONS(INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID VARCHAR(255) NOT NULL,INTERACTIONS_ID VARCHAR(255) NOT NULL,CONSTRAINT FKNRLR4POAGW2DTE8QMGEWNL9EU_INDEX_B FOREIGN KEY (INTERACTION_LOG_AGGREGATE_ROOT_CUSTOMER_ID) REFERENCES INTERACTIONLOGS(CUSTOMER_ID),CONSTRAINT UK_F9MORY4MPI8W7CI4IBSS33M11_INDEX_B UNIQUE (INTERACTIONS_ID))`);
     
     log:printInfo("End of main function.. ");      
 }
