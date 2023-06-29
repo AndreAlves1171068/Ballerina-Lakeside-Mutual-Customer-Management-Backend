@@ -277,7 +277,7 @@ jdbc:Client jdbcClient = check new (
         properties: {"connectionTimeout": "300000"}
     },
     connectionPool = {
-        maxOpenConnections: 1000
+        maxOpenConnections: 10000
     });
 
 public function getCustomer(CustomerId customerId) returns (()|CustomerDto|error<CustomerCoreNotAvailableException>) {
